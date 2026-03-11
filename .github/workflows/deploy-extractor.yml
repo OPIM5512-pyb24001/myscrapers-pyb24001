@@ -73,7 +73,7 @@ jobs:
           gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
             --gen2 \
             --region="${REGION}" \
-            --member="serviceAccount:${RUNTIME_SA}" \
+            --member="serviceAccount:${RUNTIME_SA}" 
           
 
 
