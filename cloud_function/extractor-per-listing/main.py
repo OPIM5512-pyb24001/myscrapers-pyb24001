@@ -134,21 +134,31 @@ def parse_listing(text: str) -> dict:
     mi = None
     m1 = re.search(r"(?:mileage|odometer)\s*[:\-]?\s*([\d,]+)", text, re.I)
     if m1:
-        try: mi = int(m1.group(1).replace(",", ""))
-        except ValueError: mi = None
+        try:
+            mi = int(m1.group(1).replace(",", ""))
+        except ValueError:
+            mi = None
+
     if mi is None:
         m2 = re.search(r"(\d+(?:\.\d+)?)\s*k\s*(?:mi|mile|miles)\b", text, re.I)
         if m2:
-            try: mi = int(float(m2.group(1)) * 1000)
-            except ValueError: mi = None
+            try:
+                mi = int(float(m2.group(1)) * 1000)
+            except ValueError:
+                mi = None
+
     if mi is None:
         m3 = re.search(r"(\d{1,3}(?:[,\d]{3})*)\s*(?:mi|mile|miles)\b", text, re.I)
         if m3:
-            try: mi = int(re.sub(r"[^\d]", "", m3.group(1)))
-            except ValueError: mi = None
+            try:
+                mi = int(re.sub(r"[^\d]", "", m3.group(1)))
+            except ValueError:
+                mi = None
+
     if mi is not None:
         d["mileage"] = mi
-  # fuel type
+
+    # fuel type
     m_fuel = re.search(r"fuel:\s*([A-Za-z]+)", text, re.I)
     if m_fuel:
         d["fuel_type"] = m_fuel.group(1).lower()
@@ -163,10 +173,10 @@ def parse_listing(text: str) -> dict:
     if m_drive:
         d["drive_type"] = m_drive.group(1).lower()
 
-   # title status
-   m_title = re.search(r"title status:\s*([A-Za-z]+)", text, re.I)
+    # title status
+    m_title = re.search(r"title status:\s*([A-Za-z]+)", text, re.I)
     if m_title:
-        d["title_status"] = m_title.group(1).lower()                 
+        d["title_status"] = m_title.group(1).lower()
 
     return d
 
