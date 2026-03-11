@@ -70,7 +70,7 @@ jobs:
       - name: Grant invoker to runtime SA
         run: |
           set -euo pipefail
-          gcloud functions add-iam-policy-binding "${FUNCTION_NAME}" \
+          gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
             --gen2 \
             --region="${REGION}" \
             --member="serviceAccount:${RUNTIME_SA}" \
