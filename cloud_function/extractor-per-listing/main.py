@@ -148,6 +148,25 @@ def parse_listing(text: str) -> dict:
             except ValueError: mi = None
     if mi is not None:
         d["mileage"] = mi
+  # fuel type
+    m_fuel = re.search(r"fuel:\s*([A-Za-z]+)", text, re.I)
+    if m_fuel:
+        d["fuel_type"] = m_fuel.group(1).lower()
+
+    # transmission
+    m_trans = re.search(r"transmission:\s*([A-Za-z]+)", text, re.I)
+    if m_trans:
+        d["transmission"] = m_trans.group(1).lower()
+
+    # drive type
+    m_drive = re.search(r"drive:\s*([A-Za-z0-9]+)", text, re.I)
+   if m_drive:
+       d["drive_type"] = m_drive.group(1).lower()
+
+   # title status
+   m_title = re.search(r"title status:\s*([A-Za-z]+)", text, re.I)
+   if m_title:
+       d["title_status"] = m_title.group(1).lower()                 
 
     return d
 
