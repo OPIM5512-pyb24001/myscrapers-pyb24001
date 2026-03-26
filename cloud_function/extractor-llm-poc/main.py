@@ -2,6 +2,13 @@
 # Purpose: PoC LLM extractor that reads your existing per-listing JSONL records,
 # fetches the original TXT, asks an LLM (Vertex AI) to extract fields, and writes
 # a sibling "<post_id>_llm.jsonl" to the NEW 'jsonl_llm/' sub-directory.
+#
+# FINAL FIXES INCLUDED:
+# 1. Schema updated to use "type": "string" + "nullable": True.
+# 2. system_instruction removed from GenerationConfig and merged into prompt.
+# 3. LLM_MODEL set to 'gemini-2.5-flash' (Fixes 404/NotFound error).
+# 4. "additionalProperties": False removed from schema (Fixes internal ParseError).
+# 5. Non-breaking spaces (U+00A0) replaced with standard spaces (U+0020). <--- FIX FOR THIS ERROR
 
 import os
 import re
@@ -149,10 +156,12 @@ def _safe_int(x):
 # -------------------- VERTEX AI CALL --------------------
 def _vertex_extract_fields(raw_text: str) -> dict:
     """
-    Ask Gemini to return JSON with extracted listing fields.
+    Ask Gemini to return JSON with exactly: price, year, make, model, mileage,
+    transmission, fuel_type, body_type, condition, title_status.
     """
     model = _get_vertex_model()
 
+    # Strict JSON schema - FIX: Removed "additionalProperties": False
     schema = {
         "type": "object",
         "properties": {
@@ -164,25 +173,27 @@ def _vertex_extract_fields(raw_text: str) -> dict:
             "transmission": {"type": "string", "nullable": True},
             "fuel_type": {"type": "string", "nullable": True},
             "body_type": {"type": "string", "nullable": True},
-            "color": {"type": "string", "nullable": True},
             "condition": {"type": "string", "nullable": True},
-            "title_status": {"type": "string", "nullable": True}
+            "title_status": {"type": "string", "nullable": True},
         },
         "required": ["price", "year", "make", "model", "mileage"]
     }
 
+    # System instruction (will be prepended to the prompt)
     sys_instr = (
-        "Extract the following fields from the listing text and return a JSON object "
-        "that matches the schema. If a value is not present, return null. "
-        "Fields include: price, year, make, model, mileage, transmission, fuel_type, "
-        "body_type, color, condition, and title_status. "
-        "Rules: price, year, and mileage must be integers. Price is in USD and mileage is in miles. "
-        "Do not guess values and do not add extra keys."
+        "Extract ONLY the following fields from the input text. "
+        "Return a strict JSON object that conforms to the provided schema. "
+        "If a value is not present, use null. "
+        "Fields: price, year, make, model, mileage, transmission, fuel_type, body_type, condition, title_status. "
+        "Rules: integers for price/year/mileage; price in USD; mileage in miles; "
+        "do not infer values not explicitly present; do not add extra keys."
     )
 
+    # FIX: Combine instruction and text into one prompt string (SDK compatibility)
     prompt = f"{sys_instr}\n\nTEXT:\n{raw_text}"
 
     gen_cfg = GenerationConfig(
+        # FIX: system_instruction removed to fix TypeError 
         temperature=0.0,
         top_p=1.0,
         top_k=40,
@@ -191,13 +202,16 @@ def _vertex_extract_fields(raw_text: str) -> dict:
         response_schema=schema,
     )
 
+    # --- LLM CALL WITH RETRY ---
     max_attempts = 3
     resp = None
     for attempt in range(max_attempts):
         try:
+            # Pass the single string prompt
             resp = model.generate_content(prompt, generation_config=gen_cfg)
             break
         except Exception as e:
+            # Includes the 404/NotFound error from the previous run
             if not _if_llm_retryable(e) or attempt == max_attempts - 1:
                 logging.error(f"Fatal/non-retryable LLM error or max retries reached: {e}")
                 raise
@@ -211,13 +225,13 @@ def _vertex_extract_fields(raw_text: str) -> dict:
 
     parsed = json.loads(resp.text)
 
+    # Normalize fields post-extraction
     parsed["price"] = _safe_int(parsed.get("price"))
     parsed["year"] = _safe_int(parsed.get("year"))
     parsed["mileage"] = _safe_int(parsed.get("mileage"))
     
     def _norm_str(s):
-        if s is None:
-            return None
+        if s is None: return None
         s = str(s).strip()
         return s if s else None
 
@@ -226,7 +240,6 @@ def _vertex_extract_fields(raw_text: str) -> dict:
     parsed["transmission"] = _norm_str(parsed.get("transmission"))
     parsed["fuel_type"] = _norm_str(parsed.get("fuel_type"))
     parsed["body_type"] = _norm_str(parsed.get("body_type"))
-    parsed["color"] = _norm_str(parsed.get("color"))
     parsed["condition"] = _norm_str(parsed.get("condition"))
     parsed["title_status"] = _norm_str(parsed.get("title_status"))
 
@@ -247,6 +260,7 @@ def llm_extract_http(request: Request):
     if LLM_PROVIDER != "vertex":
         return jsonify({"ok": False, "error": "PoC supports LLM_PROVIDER='vertex' only"}), 400
 
+    # Body overrides
     try:
         body = request.get_json(silent=True) or {}
     except Exception:
@@ -256,6 +270,7 @@ def llm_extract_http(request: Request):
     max_files = int(body.get("max_files") or MAX_FILES_DEFAULT or 0)
     overwrite = bool(body.get("overwrite")) if "overwrite" in body else OVERWRITE_DEFAULT
 
+    # Pick newest run if not provided
     if not run_id:
         runs = _list_structured_run_ids(BUCKET_NAME, STRUCTURED_PREFIX)
         if not runs:
@@ -277,6 +292,7 @@ def llm_extract_http(request: Request):
     for in_key in inputs:
         processed += 1
         try:
+            # Read the tiny JSON line (single record)
             raw_line = _download_text(in_key).strip()
             if not raw_line:
                 raise ValueError("empty input jsonl")
@@ -290,6 +306,7 @@ def llm_extract_http(request: Request):
             if not source_txt_key:
                 raise ValueError("missing source_txt in input record")
 
+            # Output path: uses 'jsonl_llm/' folder
             out_prefix = in_key.rsplit("/", 2)[0] + "/jsonl_llm"
             out_key = out_prefix + f"/{post_id}_llm.jsonl"
 
@@ -297,9 +314,12 @@ def llm_extract_http(request: Request):
                 skipped += 1
                 continue
 
+            # Fetch the raw listing TXT; send to LLM
             raw_listing = _download_text(source_txt_key)
+
             parsed = _vertex_extract_fields(raw_listing)
 
+            # Compose final record
             out_record = {
                 "post_id": post_id,
                 "run_id": base_rec.get("run_id", run_id),
@@ -313,7 +333,6 @@ def llm_extract_http(request: Request):
                 "transmission": parsed.get("transmission"),
                 "fuel_type": parsed.get("fuel_type"),
                 "body_type": parsed.get("body_type"),
-                "color": parsed.get("color"),
                 "condition": parsed.get("condition"),
                 "title_status": parsed.get("title_status"),
                 "llm_provider": "vertex",
