@@ -4,7 +4,6 @@
 # Writes: gs://<bucket>/<STRUCTURED_PREFIX>/datasets/listings_master_llm.csv  (atomic publish)
 
 import csv
-import io
 import json
 import os
 import re
@@ -24,7 +23,7 @@ storage_client = storage.Client()
 RUN_ID_ISO_RE   = re.compile(r"^\d{8}T\d{6}Z$")  # 20251026T170002Z
 RUN_ID_PLAIN_RE = re.compile(r"^\d{14}$")        # 20251026170002
 
-# Stable CSV schema for students
+# Stable CSV schema for LLM materialization
 CSV_COLUMNS = [
     "post_id", "run_id", "scraped_at",
     "price", "year", "make", "model", "mileage",
@@ -34,11 +33,11 @@ CSV_COLUMNS = [
 
 def _list_run_ids(bucket: str, structured_prefix: str) -> list[str]:
     it = storage_client.list_blobs(bucket, prefix=f"{structured_prefix}/", delimiter="/")
-    for _ in it:  # populate it.prefixes
+    for _ in it:
         pass
     run_ids = []
     for p in getattr(it, "prefixes", []):
-        tail = p.rstrip("/").split("/")[-1]           # e.g. run_id=20251026170002
+        tail = p.rstrip("/").split("/")[-1]
         if tail.startswith("run_id="):
             rid = tail.split("run_id=", 1)[1]
             if RUN_ID_ISO_RE.match(rid) or RUN_ID_PLAIN_RE.match(rid):
@@ -58,7 +57,6 @@ def _jsonl_records_for_run(bucket: str, structured_prefix: str, run_id: str):
             continue
         try:
             rec = json.loads(line)
-            # ensure required keys exist
             rec.setdefault("run_id", run_id)
             yield rec
         except Exception:
@@ -69,16 +67,13 @@ def _run_id_to_dt(rid: str) -> datetime:
         return datetime.strptime(rid, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
     if RUN_ID_PLAIN_RE.match(rid):
         return datetime.strptime(rid, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
-    # fallback: now
     return datetime.now(timezone.utc)
 
 def _open_gcs_text_writer(bucket: str, key: str):
     """Open a text-mode writer to GCS; close() will finalize the upload."""
     b = storage_client.bucket(bucket)
     blob = b.blob(key)
-    # Text mode avoids the flush/finalize pitfall of binary+TextIOWrapper
-    return blob.open("w")  # newline handled by csv module
-
+    return blob.open("w")
 
 def _write_csv(records: Iterable[Dict], dest_key: str, columns=CSV_COLUMNS) -> int:
     n = 0
@@ -89,7 +84,7 @@ def _write_csv(records: Iterable[Dict], dest_key: str, columns=CSV_COLUMNS) -> i
             row = {c: rec.get(c, None) for c in columns}
             w.writerow(row)
             n += 1
-    return n  # close() finalizes the upload
+    return n
 
 def materialize_http(request: Request):
     """
@@ -128,5 +123,4 @@ def materialize_http(request: Request):
             "output_csv": f"gs://{BUCKET_NAME}/{final_key}"
         }), 200
     except Exception as e:
-        # Return a JSON error so you don't just see a plain 500
         return jsonify({"ok": False, "error": f"{type(e).__name__}: {e}"}), 500
