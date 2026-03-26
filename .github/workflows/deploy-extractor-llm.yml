@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           SA_ARGS=()
           if [[ -n "${RUNTIME_SA:-}" ]]; then
-            gcloud iam service-accounts describe "${RUNTIME_SA}" >/dev/null >&1
+            gcloud iam service-accounts describe "${RUNTIME_SA}" >/dev/null 2>&1
             SA_ARGS=(--service-account="${RUNTIME_SA}")
           fi
 
@@ -97,15 +97,15 @@ jobs:
 
       - name: Grant invoker to deployer & runtime SAs
         run: |
-          gcloud run services add-iam-policy-binding "${FUNCTION_NAME}" \
+          gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
+            --gen2 \
             --region "${REGION}" \
-            --member="serviceAccount:${DEPLOYER_SA}" \
-            --role="roles/run.invoker"
+            --member="serviceAccount:${DEPLOYER_SA}"
 
-          gcloud run services add-iam-policy-binding "${FUNCTION_NAME}" \
+          gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
+            --gen2 \
             --region "${REGION}" \
-            --member="serviceAccount:${RUNTIME_SA}" \
-            --role="roles/run.invoker"
+            --member="serviceAccount:${RUNTIME_SA}"
 
       - name: Grant Vertex AI user to runtime SA (for Gemini calls)
         run: |
@@ -166,7 +166,7 @@ jobs:
           URL="${{ steps.cfurl.outputs.url }}"
           [[ -z "${URL}" ]] && { echo "Function URL empty"; exit 1; }
 
-          if gcloud scheduler jobs describe "$JOB_NAME" --location="${REGION}" >/dev/null >&1; then
+          if gcloud scheduler jobs describe "$JOB_NAME" --location="${REGION}" >/dev/null 2>&1; then
             gcloud scheduler jobs update http "$JOB_NAME" \
               --location="${REGION}" \
               --schedule="${CRON_EXPR}" \
