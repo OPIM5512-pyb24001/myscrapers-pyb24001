@@ -22,6 +22,8 @@ jobs:
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.PROJECT_ID }}
 
       - name: Deploy Cloud Function (Gen2)
         run: |
@@ -33,6 +35,8 @@ jobs:
             --entry-point=materialize_http \
             --trigger-http \
             --allow-unauthenticated \
+            --timeout=540s \
+            --memory=1024Mi \
             --set-env-vars=GCS_BUCKET=${{ vars.BUCKET_NAME }},STRUCTURED_PREFIX=structured \
             --service-account=${{ vars.RUNTIME_SA }}
 
@@ -54,14 +58,18 @@ jobs:
             gcloud scheduler jobs update http "$JOB_NAME" \
               --location=${{ vars.REGION }} \
               --schedule="0 * * * *" \
+              --time-zone="America/New_York" \
               --uri="$URL" \
               --http-method=POST \
-              --oidc-service-account-email=${{ vars.RUNTIME_SA }}
+              --oidc-service-account-email=${{ vars.RUNTIME_SA }} \
+              --oidc-token-audience="$URL"
           else
             gcloud scheduler jobs create http "$JOB_NAME" \
               --location=${{ vars.REGION }} \
               --schedule="0 * * * *" \
+              --time-zone="America/New_York" \
               --uri="$URL" \
               --http-method=POST \
-              --oidc-service-account-email=${{ vars.RUNTIME_SA }}
+              --oidc-service-account-email=${{ vars.RUNTIME_SA }} \
+              --oidc-token-audience="$URL"
           fi
