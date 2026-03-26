@@ -139,11 +139,7 @@ jobs:
 
           gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
             --member="serviceAccount:${SCHED_AGENT}" \
-            --role="roles/iam.serviceAccountTokenCreator"
-
-          gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
-            --member="serviceAccount:${DEPLOYER_SA}" \
-            --role="roles/iam.serviceAccountUser"
+            --role="roles/iam.serviceAccountTokenCreator" || true
 
       - name: Create/Update Cloud Scheduler job
         shell: bash
