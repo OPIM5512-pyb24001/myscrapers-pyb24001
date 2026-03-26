@@ -156,8 +156,8 @@ def _safe_int(x):
 # -------------------- VERTEX AI CALL --------------------
 def _vertex_extract_fields(raw_text: str) -> dict:
     """
-    Ask Gemini to return JSON with exactly: price, year, make, model, mileage,
-    transmission, fuel_type, body_type, condition, title_status.
+    Ask Gemini to return JSON with exactly: price, year, make, model,
+    transmission, mileage.
     """
     model = _get_vertex_model()
 
@@ -169,14 +169,13 @@ def _vertex_extract_fields(raw_text: str) -> dict:
             "year": {"type": "integer", "nullable": True},
             "make": {"type": "string", "nullable": True},
             "model": {"type": "string", "nullable": True},
-            "mileage": {"type": "integer", "nullable": True},
             "transmission": {"type": "string", "nullable": True},
             "fuel_type": {"type": "string", "nullable": True},
-            "body_type": {"type": "string", "nullable": True},
-            "condition": {"type": "string", "nullable": True},
+            "drive_type": {"type": "string", "nullable": True},
             "title_status": {"type": "string", "nullable": True},
+            "mileage": {"type": "integer", "nullable": True},
         },
-        "required": ["price", "year", "make", "model", "mileage"]
+        "required": ["price", "year", "make", "model", "transmission", "mileage"]
     }
 
     # System instruction (will be prepended to the prompt)
@@ -184,8 +183,9 @@ def _vertex_extract_fields(raw_text: str) -> dict:
         "Extract ONLY the following fields from the input text. "
         "Return a strict JSON object that conforms to the provided schema. "
         "If a value is not present, use null. "
-        "Fields: price, year, make, model, mileage, transmission, fuel_type, body_type, condition, title_status. "
         "Rules: integers for price/year/mileage; price in USD; mileage in miles; "
+        "transmission can be manual or automatic; "
+        "fuel_type can be gas, diesel, hybrid, or electric; "
         "do not infer values not explicitly present; do not add extra keys."
     )
 
@@ -193,7 +193,7 @@ def _vertex_extract_fields(raw_text: str) -> dict:
     prompt = f"{sys_instr}\n\nTEXT:\n{raw_text}"
 
     gen_cfg = GenerationConfig(
-        # FIX: system_instruction removed to fix TypeError 
+        # FIX: system_instruction removed to fix TypeError
         temperature=0.0,
         top_p=1.0,
         top_k=40,
@@ -211,7 +211,6 @@ def _vertex_extract_fields(raw_text: str) -> dict:
             resp = model.generate_content(prompt, generation_config=gen_cfg)
             break
         except Exception as e:
-            # Includes the 404/NotFound error from the previous run
             if not _if_llm_retryable(e) or attempt == max_attempts - 1:
                 logging.error(f"Fatal/non-retryable LLM error or max retries reached: {e}")
                 raise
@@ -231,7 +230,8 @@ def _vertex_extract_fields(raw_text: str) -> dict:
     parsed["mileage"] = _safe_int(parsed.get("mileage"))
     
     def _norm_str(s):
-        if s is None: return None
+        if s is None:
+            return None
         s = str(s).strip()
         return s if s else None
 
@@ -239,8 +239,7 @@ def _vertex_extract_fields(raw_text: str) -> dict:
     parsed["model"] = _norm_str(parsed.get("model"))
     parsed["transmission"] = _norm_str(parsed.get("transmission"))
     parsed["fuel_type"] = _norm_str(parsed.get("fuel_type"))
-    parsed["body_type"] = _norm_str(parsed.get("body_type"))
-    parsed["condition"] = _norm_str(parsed.get("condition"))
+    parsed["drive_type"] = _norm_str(parsed.get("drive_type"))
     parsed["title_status"] = _norm_str(parsed.get("title_status"))
 
     return parsed
@@ -329,12 +328,11 @@ def llm_extract_http(request: Request):
                 "year": parsed.get("year"),
                 "make": parsed.get("make"),
                 "model": parsed.get("model"),
-                "mileage": parsed.get("mileage"),
                 "transmission": parsed.get("transmission"),
                 "fuel_type": parsed.get("fuel_type"),
-                "body_type": parsed.get("body_type"),
-                "condition": parsed.get("condition"),
+                "drive_type": parsed.get("drive_type"),
                 "title_status": parsed.get("title_status"),
+                "mileage": parsed.get("mileage"),
                 "llm_provider": "vertex",
                 "llm_model": LLM_MODEL,
                 "llm_ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
