@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           SA_ARGS=()
           if [[ -n "${RUNTIME_SA:-}" ]]; then
-            gcloud iam service-accounts describe "${RUNTIME_SA}" >/dev/null 2>&1
+            gcloud iam service-accounts describe "${RUNTIME_SA}" >/dev/null >&1
             SA_ARGS=(--service-account="${RUNTIME_SA}")
           fi
 
@@ -95,13 +95,8 @@ jobs:
           URL=$(gcloud functions describe "${FUNCTION_NAME}" --gen2 --region "${REGION}" --format='value(serviceConfig.uri)')
           echo "url=${URL}" >> "$GITHUB_OUTPUT"
 
-      - name: Grant invoker to deployer & runtime SAs
+      - name: Grant invoker to runtime SA
         run: |
-          gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
-            --gen2 \
-            --region "${REGION}" \
-            --member="serviceAccount:${DEPLOYER_SA}"
-
           gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
             --gen2 \
             --region "${REGION}" \
@@ -144,27 +139,18 @@ jobs:
 
           gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
             --member="serviceAccount:${SCHED_AGENT}" \
-            --role="roles/iam.serviceAccountTokenCreator" || {
-              echo "::error::Permission denied adding tokenCreator to ${RUNTIME_SA}. Run (once as project owner):"
-              echo "gcloud iam service-accounts add-iam-policy-binding \"${RUNTIME_SA}\" --member=\"serviceAccount:${SCHED_AGENT}\" --role=\"roles/iam.serviceAccountTokenCreator\""
-              exit 1
-            }
+            --role="roles/iam.serviceAccountTokenCreator"
 
           gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
             --member="serviceAccount:${DEPLOYER_SA}" \
-            --role="roles/iam.serviceAccountUser" || {
-              echo "::error::Permission denied adding ServiceAccountUser for ${DEPLOYER_SA} on ${RUNTIME_SA}. Run:"
-              echo "gcloud iam service-accounts add-iam-policy-binding \"${RUNTIME_SA}\" --member=\"serviceAccount:${DEPLOYER_SA}\" --role=\"roles/iam.serviceAccountUser\""
-              exit 1
-            }
+            --role="roles/iam.serviceAccountUser"
 
-      - name: Create/Update Cloud Scheduler job (:1 ET, uses runtime SA OIDC)
+      - name: Create/Update Cloud Scheduler job
         shell: bash
         run: |
           set -euo pipefail
           JOB_NAME="${FUNCTION_NAME}-hourly"
           URL="${{ steps.cfurl.outputs.url }}"
-          [[ -z "${URL}" ]] && { echo "Function URL empty"; exit 1; }
 
           if gcloud scheduler jobs describe "$JOB_NAME" --location="${REGION}" >/dev/null 2>&1; then
             gcloud scheduler jobs update http "$JOB_NAME" \
