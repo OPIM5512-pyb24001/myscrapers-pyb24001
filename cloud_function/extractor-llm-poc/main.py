@@ -156,8 +156,9 @@ def _safe_int(x):
 # -------------------- VERTEX AI CALL --------------------
 def _vertex_extract_fields(raw_text: str) -> dict:
     """
-    Ask Gemini to return JSON with exactly: price, year, make, model,
-    transmission, mileage.
+    Ask Gemini to return JSON with exactly:
+    price, year, make, model, transmission, fuel_type, drive_type,
+    title_status, condition, color, city, state, mileage.
     """
     model = _get_vertex_model()
 
@@ -173,6 +174,10 @@ def _vertex_extract_fields(raw_text: str) -> dict:
             "fuel_type": {"type": "string", "nullable": True},
             "drive_type": {"type": "string", "nullable": True},
             "title_status": {"type": "string", "nullable": True},
+            "condition": {"type": "string", "nullable": True},
+            "color": {"type": "string", "nullable": True},
+            "city": {"type": "string", "nullable": True},
+            "state": {"type": "string", "nullable": True},
             "mileage": {"type": "integer", "nullable": True},
         },
         "required": ["price", "year", "make", "model", "transmission", "mileage"]
@@ -183,9 +188,14 @@ def _vertex_extract_fields(raw_text: str) -> dict:
         "Extract ONLY the following fields from the input text. "
         "Return a strict JSON object that conforms to the provided schema. "
         "If a value is not present, use null. "
+        "Fields include price, year, make, model, transmission, fuel_type, drive_type, "
+        "title_status, condition, color, city, state, and mileage. "
         "Rules: integers for price/year/mileage; price in USD; mileage in miles; "
         "transmission can be manual or automatic; "
         "fuel_type can be gas, diesel, hybrid, or electric; "
+        "drive_type can be fwd, rwd, awd, or 4wd; "
+        "condition should reflect listing condition when explicitly stated; "
+        "city and state should reflect listing location when explicitly stated; "
         "do not infer values not explicitly present; do not add extra keys."
     )
 
@@ -214,7 +224,7 @@ def _vertex_extract_fields(raw_text: str) -> dict:
             if not _if_llm_retryable(e) or attempt == max_attempts - 1:
                 logging.error(f"Fatal/non-retryable LLM error or max retries reached: {e}")
                 raise
-            
+
             sleep_time = LLM_RETRY._calculate_sleep(attempt)
             logging.warning(f"Transient LLM error on attempt {attempt+1}/{max_attempts}. Retrying in {sleep_time:.2f}s...")
             time.sleep(sleep_time)
@@ -228,7 +238,7 @@ def _vertex_extract_fields(raw_text: str) -> dict:
     parsed["price"] = _safe_int(parsed.get("price"))
     parsed["year"] = _safe_int(parsed.get("year"))
     parsed["mileage"] = _safe_int(parsed.get("mileage"))
-    
+
     def _norm_str(s):
         if s is None:
             return None
@@ -241,6 +251,10 @@ def _vertex_extract_fields(raw_text: str) -> dict:
     parsed["fuel_type"] = _norm_str(parsed.get("fuel_type"))
     parsed["drive_type"] = _norm_str(parsed.get("drive_type"))
     parsed["title_status"] = _norm_str(parsed.get("title_status"))
+    parsed["condition"] = _norm_str(parsed.get("condition"))
+    parsed["color"] = _norm_str(parsed.get("color"))
+    parsed["city"] = _norm_str(parsed.get("city"))
+    parsed["state"] = _norm_str(parsed.get("state"))
 
     return parsed
 
@@ -332,6 +346,10 @@ def llm_extract_http(request: Request):
                 "fuel_type": parsed.get("fuel_type"),
                 "drive_type": parsed.get("drive_type"),
                 "title_status": parsed.get("title_status"),
+                "condition": parsed.get("condition"),
+                "color": parsed.get("color"),
+                "city": parsed.get("city"),
+                "state": parsed.get("state"),
                 "mileage": parsed.get("mileage"),
                 "llm_provider": "vertex",
                 "llm_model": LLM_MODEL,
