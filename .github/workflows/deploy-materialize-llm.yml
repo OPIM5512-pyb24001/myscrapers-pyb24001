@@ -37,7 +37,7 @@ jobs:
             --allow-unauthenticated \
             --timeout=540s \
             --memory=1024Mi \
-            --set-env-vars=GCS_BUCKET=${{ vars.BUCKET_NAME }},STRUCTURED_PREFIX=structured \
+            --set-env-vars=GCS_BUCKET=${{ vars.BUCKET_NAME }},STRUCTURED_PREFIX=structured,MAX_FILES=30 \
             --service-account=${{ vars.RUNTIME_SA }}
 
       - name: Get Function URL
