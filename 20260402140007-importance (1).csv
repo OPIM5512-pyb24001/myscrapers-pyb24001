@@ -1,0 +1,332 @@
+feature,importance
+car_age,1.191630201925029
+log_mileage,0.49776362911097516
+drive_type_awd,0.11987427363702194
+city_bridgeport,0.10653110275719449
+condition_other,0.0616495544414723
+condition_like new,0.03278678346341892
+condition_good,0.03113963221550754
+make_toyota,0.018268063135083234
+drive_type_unknown,0.017790066110114945
+city_norwalk,0.013219236320755912
+make_lexus,0.01196748157550107
+condition_excellent,0.010148165360000305
+city_meriden,0.009878960258151104
+drive_type_fwd,0.009258083635359692
+make_dodge,0.008769705127034223
+city_wallingford,0.008632980615950758
+city_shelton,0.007809003619366784
+model_Charger,0.007304827370926558
+make_chevrolet,0.004522571627641437
+color_gray,0.004417278879141529
+city_east granby,0.004389134265757999
+fuel_type_gas,0.004061841897873342
+drive_type_rwd,0.003004113330443303
+model_Elantra,0.002187154608571229
+color_blue,0.0020209590726741446
+make_nissan,0.0015854595982669362
+make_subaru,0.0013556728493321236
+city_derby,0.0012380449806814742
+city_west hartford,0.0010058009516549782
+color_black,0.000799832329237904
+make_ford,0.000749933146683246
+state_nj,0.0004995727661857407
+make_audi,0.0004880290588358149
+make_acura,0.0004093940736790147
+make_cadillac,0.00030328635409978546
+model_Fusion,0.00022415706296532444
+fuel_type_nan,0.0002018530884313363
+model_elantra,0.00015260599457782574
+transmission_nan,6.751297945968293e-05
+model_legacy,6.185147275961089e-05
+make_volvo,2.8575940325969996e-05
+model_outback,2.235936226677726e-05
+model_express 2500,0.0
+model_express 3500,0.0
+model_f-350,0.0
+model_ranger,0.0
+model_f-150,0.0
+model_focus,0.0
+model_grand caravan sxt,0.0
+model_impala SS,0.0
+model_tlx,0.0
+model_town & country,0.0
+model_land cruiser,0.0
+model_liberty sport,0.0
+model_liberty sport 4x4,0.0
+model_m2,0.0
+model_f450 super duty,0.0
+model_mdx,0.0
+model_crosstrek 2.0i premium awd,0.0
+model_cruze,0.0
+model_e-350 econoline,0.0
+model_e-450,0.0
+model_e350 4matic wagon,0.0
+model_e350 super duty cutaway,0.0
+model_quest sl,0.0
+model_malibu,0.0
+model_TERRAIN SLE-2,0.0
+model_Tahoe,0.0
+model_Tiguan,0.0
+model_Town & Country,0.0
+model_Trans Am,0.0
+model_Traverse,0.0
+model_equinox lt,0.0
+model_Venza,0.0
+model_grand cherokee laredo 4x4,0.0
+model_X1,0.0
+model_X2,0.0
+model_X3 2.8i X-drive,0.0
+model_XF,0.0
+model_XV CrossTrek,0.0
+model_XV Crosstrek Hybrid,0.0
+model_Range Rover,0.0
+model_Ranger Xlt,0.0
+model_Versa,0.0
+model_forester,0.0
+model_fusion se,0.0
+model_Yukon XL,0.0
+model_a3,0.0
+model_accord,0.0
+model_accord lx,0.0
+model_altima,0.0
+model_altima 2.5 sl,0.0
+model_corolla le,0.0
+model_jetta,0.0
+model_camaro z28,0.0
+model_camry le,0.0
+model_camry le sedan,0.0
+model_camry xle sedan,0.0
+model_civic,0.0
+model_civic ex,0.0
+model_compass,0.0
+model_impreza,0.0
+city_guilford,0.0
+city_fairfield,0.0
+city_fair lawn,0.0
+city_east berlin,0.0
+city_danbury,0.0
+fuel_type_hybrid,0.0
+fuel_type_electric,0.0
+make_chrysler,0.0
+city_poughkeepsie,0.0
+city_oxford,0.0
+city_oakville,0.0
+make_infiniti,0.0
+make_hyandia,0.0
+make_hummer,0.0
+make_honda,0.0
+model_Range Rover Sport,0.0
+make_freightliner,0.0
+make_bmw,0.0
+city_northford,0.0
+city_north haven,0.0
+city_new milford,0.0
+city_new haven,0.0
+city_naugatuck,0.0
+city_nashua,0.0
+city_milford,0.0
+city_middlebury,0.0
+city_southington,0.0
+make_mazda,0.0
+make_lincoln,0.0
+make_land rover,0.0
+make_kia,0.0
+make_gmc,0.0
+model_golf,0.0
+model_gl450 4matic,0.0
+model_g37,0.0
+model_silverado,0.0
+model_s430,0.0
+model_s,0.0
+model_rx350L,0.0
+model_rogue s,0.0
+model_regal custom coupe,0.0
+model_rdx sh-awd w/tech,0.0
+model_rav4 hybrid,0.0
+model_promaster city,0.0
+model_pickup,0.0
+model_outback 3.6r limited awd,0.0
+model_outback 3.6,0.0
+city_hudson,0.0
+model_outback 2.5i limited,0.0
+fuel_type_diesel,0.0
+model_x5,0.0
+model_wrangler sport,0.0
+model_transit cargo van,0.0
+model_town and country limited,0.0
+city_bethany,0.0
+color_green,0.0
+model_tiguan,0.0
+model_suburban lt,0.0
+model_soul +,0.0
+model_sonata,0.0
+model_silverado 2500,0.0
+state_nh,0.0
+state_ma,0.0
+model_outback 2.5i premium,0.0
+model_9-2X Aero,0.0
+model_9-3 convertible,0.0
+model_A4,0.0
+model_A5,0.0
+model_A6 45 TFSI Premium,0.0
+model_AMG GLE 43 Studio,0.0
+model_ATS Sedan,0.0
+model_ATS-4 AWD Sport Sedan,0.0
+model_S500 4Matic,0.0
+model_Accord LX,0.0
+model_Altima,0.0
+model_Avalanche,0.0
+model_Box Truck,0.0
+model_C/K Pickup,0.0
+model_CAMRY LE,0.0
+make_saab,0.0
+make_tesla,0.0
+model_Accord,0.0
+model_Equinox L,0.0
+model_Escape,0.0
+model_CAMRY SE,0.0
+model_CHEVELLE,0.0
+model_CR-V EX,0.0
+model_CR-V EX-L,0.0
+model_CR-V LX,0.0
+model_CX-5,0.0
+model_750li xdrive,0.0
+model_Camaro,0.0
+model_Camry,0.0
+model_Caprice,0.0
+model_Cherokee Latitude,0.0
+model_Civic,0.0
+model_Civic LX,0.0
+model_Civic Sedan,0.0
+model_Cooper S,0.0
+model_Forester,0.0
+make_pontiac,0.0
+city_killingworth,0.0
+city_madison,0.0
+city_manchester,0.0
+city_stratford,0.0
+state_ny,0.0
+make_fiat,0.0
+make_jeep,0.0
+make_volkswagen,0.0
+make_buick,0.0
+make_ram,0.0
+city_canterbury,0.0
+make_jaguar,0.0
+state_ga,0.0
+city_westfield,0.0
+city_waterbury,0.0
+city_trumbull,0.0
+condition_fair,0.0
+model_240,0.0
+model_262C Bertone,0.0
+model_3 series,0.0
+model_3.5RL,0.0
+model_325i,0.0
+model_328i X-drive AWD Sedan,0.0
+model_328i Xdrive Sedan,0.0
+model_5 Series,0.0
+make_nan,0.0
+model_500,0.0
+make_amc,0.0
+city_cheshire,0.0
+city_dallas,0.0
+make_mercedes benz,0.0
+make_mercedes-benz,0.0
+make_mercury,0.0
+make_mini,0.0
+make_mitsubishi,0.0
+model_5 touring,0.0
+model_Pathfinder S,0.0
+model_Tundra,0.0
+model_Pilot,0.0
+model_Prius Hybrid Hatchback,0.0
+model_Prius Two,0.0
+model_ProMaster 2500 High Roof 159in WB,0.0
+model_Promaster 2500,0.0
+model_Q3,0.0
+model_Equinox,0.0
+model_RX350,0.0
+model_Rambler Classic,0.0
+model_LS 460,0.0
+model_LX 570,0.0
+model_Liberty Limited Sport,0.0
+model_MDX,0.0
+model_MDX SPORT,0.0
+model_MK V drophead,0.0
+model_Q50,0.0
+model_Rio,0.0
+model_Rogue,0.0
+model_S-Class,0.0
+model_camaro,0.0
+city_tariffville,0.0
+model_S60 T5 AWD Sport Sedan,0.0
+model_SILVERADO-1500-2WHEEL DRIVE,0.0
+model_Savana 1500 Cargo,0.0
+model_Passat SE,0.0
+model_Sonata,0.0
+model_Sprinter 3500,0.0
+model_Sprinter C2500/C3500,0.0
+model_Super Duty F-350 SRW,0.0
+model_Outback,0.0
+model_PACIFICA TOURING L,0.0
+model_PROMASTER 2500 159 WB,0.0
+model_Passat,0.0
+model_Silverado 1500,0.0
+model_Grand Cherokee Laredo,0.0
+model_H2,0.0
+model_JX35 Premium AWD SUV,0.0
+model_Jetta Sedan,0.0
+model_LC 500,0.0
+model_Crossfire,0.0
+model_Dakota,0.0
+model_E-350 super duty,0.0
+model_S-class S550,0.0
+model_ELECTRA,0.0
+model_ES350,0.0
+model_MKT Limo,0.0
+model_EX35,0.0
+model_EXPRESS 1500,0.0
+model_Econoline Cargo Van E-250,0.0
+model_Edge,0.0
+model_El Camino SS,0.0
+model_E250,0.0
+model_Malibu,0.0
+model_Model Y,0.0
+model_Montero,0.0
+model_Mountaineer,0.0
+model_Mustang Convertible,0.0
+model_Mustang V6 Coupe premium,0.0
+model_NX 300,0.0
+model_Neon,0.0
+model_Grand Cherokee L,0.0
+model_Explorer,0.0
+model_Express 2500 Cargo,0.0
+model_F-150,0.0
+model_F-350 Super Duty,0.0
+model_F150,0.0
+model_F250,0.0
+model_Pathfinder SL AWD SUV,0.0
+model_GLK-Class,0.0
+model_Grand Caravan,0.0
+model_Optima,0.0
+title_status_rebuilt,-3.1490767940467454e-05
+model_Crosstrek,-4.319491554032329e-05
+title_status_clean,-7.610109460404191e-05
+city_west haven,-9.52850494497337e-05
+city_north branford,-0.0004057725517820132
+make_saturn,-0.0007776099517206259
+city_southbury,-0.0008435158855167213
+model_Vue,-0.0009219327679854227
+model_silverado 1500,-0.0009232346995561747
+make_hyundai,-0.0010450609941352607
+city_hamden,-0.0015042614400796017
+transmission_automatic,-0.0016421942617618202
+city_stamford,-0.0018342618561576595
+color_white,-0.0024083201541346133
+city_branford,-0.00806950892437457
+color_red,-0.008342973403414944
+state_ct,-0.008790111695849357
+transmission_manual,-0.016047003261359015
+color_other,-0.016287416187817583
