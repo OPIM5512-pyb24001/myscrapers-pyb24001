@@ -1,4 +1,5 @@
 name: Data Sync Hourly Predictions to Repo
+run-name: Syncing hourly predictions for ${{ github.ref_name }} by @${{ github.actor }}
 
 on:
   schedule:
@@ -10,66 +11,67 @@ permissions:
   id-token: write
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-concurrency:
-  group: sync-data-${{ github.ref }}
-  cancel-in-progress: false
+  PROJECT_ID: ${{ vars.PROJECT_ID }}
+  BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+  WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+  DEPLOYER_SA: ${{ vars.DEPLOYER_SA }}
+  GCS_PREDS_PREFIX: "structured/preds"
+  OUTPUT_DIR: "results"
 
 jobs:
-  sync-data:
+  sync_data:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Authenticate to Google Cloud via Workload Identity Federation
+      - name: Auth (WIF) and Setup gcloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ vars.PROJECT_ID }}
 
-      - name: Prepare local folders
-        run: |
-          mkdir -p results
-          mkdir -p /tmp/preds_sync
-
-      - name: Copy prediction folders from GCS (fast parallel)
-        shell: bash
-        run: |
-          set -euo pipefail
-          gsutil -m cp -r "gs://${{ vars.BUCKET_NAME }}/structured/preds/*" /tmp/preds_sync/ || true
-
-      - name: Flatten preds.csv files into results
+      - name: Find Latest Run ID, Download, and Rename File
+        id: download_rename
         shell: bash
         run: |
           set -euo pipefail
 
-          while IFS= read -r file; do
-            run_id=$(basename "$(dirname "$file")")
-            cp "$file" "results/${run_id}-preds.csv"
-          done < <(find /tmp/preds_sync -type f -name "preds.csv" | sort)
+          LATEST_RUN_DIR=$(gsutil ls -d gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/*/ | tail -1)
+          LATEST_RUN_ID=$(echo "$LATEST_RUN_DIR" | sed -E "s|gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/||; s|/||")
 
-      - name: Commit and push if changed
-        shell: bash
+          LOCAL_FILENAME="$LATEST_RUN_ID-preds.csv"
+          GCS_SOURCE_FILE="${{ env.GCS_PREDS_PREFIX }}/$LATEST_RUN_ID/preds.csv"
+          LOCAL_TARGET_FILE="${{ env.OUTPUT_DIR }}/$LOCAL_FILENAME"
+
+          echo "run_id=$LATEST_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "filename=$LOCAL_FILENAME" >> "$GITHUB_OUTPUT"
+
+          echo "Detected latest run ID: $LATEST_RUN_ID"
+
+          mkdir -p ${{ env.OUTPUT_DIR }}
+          gsutil cp gs://${BUCKET_NAME}/${GCS_SOURCE_FILE} ${LOCAL_TARGET_FILE}
+
+          echo "Successfully copied: gs://${BUCKET_NAME}/${GCS_SOURCE_FILE} to ${LOCAL_TARGET_FILE}"
+
+      - name: Commit and Push New Timestamped File
+        if: success()
         run: |
-          set -euo pipefail
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          FILENAME="${{ steps.download_rename.outputs.filename }}"
+          RUN_ID="${{ steps.download_rename.outputs.run_id }}"
 
-          git add results/
+          git add ${{ env.OUTPUT_DIR }}/$FILENAME
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
+          git commit -m "🤖 Data Sync: Add hourly prediction file for run $RUN_ID" || echo "No changes to commit"
 
-          git commit -m "🤖 Data Sync: Add hourly prediction files"
+          git pull --rebase origin main || true
           git push
