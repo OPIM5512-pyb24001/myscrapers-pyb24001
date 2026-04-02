@@ -1,13 +1,12 @@
-name: Deploy Scraper (CF Gen2 + Cloud Scheduler)
-run-name: "Scraper deploy by ${{ github.actor }} • ${{ github.ref_name }}"
+name: Deploy train-dt (CF Gen2 + Cloud Scheduler)
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
     paths:
-      - 'cloud_function/scraper_cars/**'
-      - '.github/workflows/deploy.yml'
-  workflow_dispatch: {}
+      - 'cloud_function/train-dt/**'
+      - '.github/workflows/deploy-train-dt.yml'
 
 permissions:
   contents: read
@@ -16,16 +15,20 @@ permissions:
 env:
   PROJECT_ID: ${{ vars.PROJECT_ID }}
   REGION: ${{ vars.REGION }}
-  FUNCTION_NAME: craigslist-scraper
-  FUNCTION_DIR: cloud_function/scraper_cars
-  ENTRY_POINT: entrypoint
+  FUNCTION_NAME: train-dt
+  FUNCTION_DIR: cloud_function/train-dt
+  ENTRY_POINT: train_dt_http
   RUNTIME: python312
   BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+  TIMEOUT_SECONDS: "900"
+  MEMORY: "2Gi"
+  DATA_KEY: "structured/datasets/listings_master_llm.csv"
+  OUTPUT_PREFIX: "structured/preds"
   RUNTIME_SA: ${{ vars.RUNTIME_SA }}
   DEPLOYER_SA: ${{ vars.DEPLOYER_SA }}
   WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
-  SCHEDULE_BODY: ${{ vars.SCHEDULE_BODY || '{"pages":1,"max":3}' }}
-  CRON_EXPR: "0 * * * *"         # :00 every hour; America/New_York set below
+  SCHEDULE_BODY: ${{ vars.TRAIN_DT_BODY || '{"dry_run":true}' }}
+  CRON_EXPR: "20 * * * *"
 
 jobs:
   deploy:
@@ -36,17 +39,26 @@ jobs:
       - name: Auth (WIF)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.DEPLOYER_SA }}
+          workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
           create_credentials_file: true
           export_environment_variables: true
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ env.PROJECT_ID }}
+          project_id: ${{ vars.PROJECT_ID }}
 
-      - name: Deploy Cloud Function (Gen2, HTTP, authenticated)
+      - name: Verify source
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la "${FUNCTION_DIR}"
+          test -f "${FUNCTION_DIR}/main.py"
+          test -f "${FUNCTION_DIR}/requirements.txt"
+
+      - name: Deploy Cloud Function (Gen2)
+        shell: bash
         run: |
           set -euo pipefail
           SA_ARGS=()
@@ -54,6 +66,7 @@ jobs:
             gcloud iam service-accounts describe "${RUNTIME_SA}" >/dev/null 2>&1
             SA_ARGS=(--service-account="${RUNTIME_SA}")
           fi
+
           gcloud functions deploy "${FUNCTION_NAME}" \
             --gen2 \
             --region="${REGION}" \
@@ -62,62 +75,53 @@ jobs:
             --entry-point="${ENTRY_POINT}" \
             --trigger-http \
             --no-allow-unauthenticated \
+            --timeout="${TIMEOUT_SECONDS}" \
+            --memory="${MEMORY}" \
             "${SA_ARGS[@]}" \
-            --set-env-vars="PROJECT_ID=${PROJECT_ID},BUCKET_NAME=${BUCKET_NAME}" \
-            --memory=512Mi \
-            --timeout=540s
-
-      - name: Grant invoker to deployer & runtime SAs
-        run: |
-          gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
-            --gen2 --region "${REGION}" \
-            --member="serviceAccount:${DEPLOYER_SA}"
-          gcloud functions add-invoker-policy-binding "${FUNCTION_NAME}" \
-            --gen2 --region "${REGION}" \
-            --member="serviceAccount:${RUNTIME_SA}"
+            --set-env-vars="PROJECT_ID=${PROJECT_ID},GCS_BUCKET=${BUCKET_NAME},DATA_KEY=${DATA_KEY},OUTPUT_PREFIX=${OUTPUT_PREFIX}"
 
       - name: Get Function URL
         id: cfurl
+        shell: bash
         run: |
+          set -euo pipefail
           URL=$(gcloud functions describe "${FUNCTION_NAME}" --gen2 --region "${REGION}" --format='value(serviceConfig.uri)')
           echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "Function URL: ${URL}"
 
       - name: Ensure Scheduler API enabled
+        shell: bash
         run: |
           set -euo pipefail
           gcloud services list --enabled --filter="cloudscheduler.googleapis.com" --format="value(config.name)" | grep -q cloudscheduler.googleapis.com \
             || gcloud services enable cloudscheduler.googleapis.com
 
-      # These two bindings are REQUIRED for Cloud Scheduler OIDC using RUNTIME_SA
       - name: Bootstrap IAM for Scheduler OIDC (runtime SA)
+        shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${RUNTIME_SA:-}" ]]; then
-            echo "RUNTIME_SA is empty; set repo var RUNTIME_SA to your runtime service account."; exit 1
+            echo "::error::RUNTIME_SA is not set. Add repo variable RUNTIME_SA."
+            exit 1
           fi
+
           PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
           SCHED_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
           echo "Scheduler agent: ${SCHED_AGENT}"
 
-          # 1) Let Scheduler mint OIDC tokens as the RUNTIME_SA
-          gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
+          if ! gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
             --member="serviceAccount:${SCHED_AGENT}" \
-            --role="roles/iam.serviceAccountTokenCreator" || {
-              echo "::error::Permission denied adding tokenCreator to ${RUNTIME_SA}. Run (once as project owner):"
-              echo "gcloud iam service-accounts add-iam-policy-binding \"${RUNTIME_SA}\" --member=\"serviceAccount:${SCHED_AGENT}\" --role=\"roles/iam.serviceAccountTokenCreator\""
-              exit 1
-            }
-      
-          # 2) Allow the deployer SA to 'actAs' the RUNTIME_SA when creating the job
-          gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
-            --member="serviceAccount:${DEPLOYER_SA}" \
-            --role="roles/iam.serviceAccountUser" || {
-              echo "::error::Permission denied adding ServiceAccountUser for ${DEPLOYER_SA} on ${RUNTIME_SA}. Run:"
-              echo "gcloud iam service-accounts add-iam-policy-binding \"${RUNTIME_SA}\" --member=\"serviceAccount:${DEPLOYER_SA}\" --role=\"roles/iam.serviceAccountUser\""
-              exit 1
-            }
+            --role="roles/iam.serviceAccountTokenCreator"; then
+            echo "::warning::Could not add tokenCreator automatically. Add it manually once if needed."
+          fi
 
-      - name: Create/Update Cloud Scheduler job (:00 ET, uses runtime SA OIDC)
+          if ! gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
+            --member="serviceAccount:${DEPLOYER_SA}" \
+            --role="roles/iam.serviceAccountUser"; then
+            echo "::warning::Could not add ServiceAccountUser automatically. Add it manually once if needed."
+          fi
+
+      - name: Create/Update Cloud Scheduler job (:20 ET, OIDC)
         shell: bash
         run: |
           set -euo pipefail
@@ -133,6 +137,7 @@ jobs:
               --uri="${URL}" \
               --http-method=POST \
               --message-body='${{ env.SCHEDULE_BODY }}' \
+              --attempt-deadline="${TIMEOUT_SECONDS}s" \
               --oidc-service-account-email="${RUNTIME_SA}" \
               --oidc-token-audience="${URL}"
           else
@@ -143,6 +148,7 @@ jobs:
               --uri="${URL}" \
               --http-method=POST \
               --message-body='${{ env.SCHEDULE_BODY }}' \
+              --attempt-deadline="${TIMEOUT_SECONDS}s" \
               --oidc-service-account-email="${RUNTIME_SA}" \
               --oidc-token-audience="${URL}"
           fi
