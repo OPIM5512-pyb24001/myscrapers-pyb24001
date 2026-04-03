@@ -76,7 +76,6 @@ def run_once():
     ].copy()
 
     # ---------------- Time split ----------------
-    # Train on past data and predict newest day's listings
     df["scraped_at"] = pd.to_datetime(df["scraped_at"], errors="coerce", utc=True)
     df["date"] = df["scraped_at"].dt.date
 
@@ -101,7 +100,6 @@ def run_once():
         "city",
         "state",
     ]
-
     num_cols = ["car_age", "log_mileage"]
     features = cat_cols + num_cols
 
@@ -146,7 +144,6 @@ def run_once():
         logging.info(f"MAE: {mae}")
 
     # ---------------- Unique run_id ----------------
-    # This ensures every run gets its own folder
     now_utc = pd.Timestamp.utcnow().tz_convert("UTC")
     run_id = now_utc.strftime("%Y%m%dT%H%M%SZ")
 
@@ -178,10 +175,9 @@ def run_once():
         n_jobs=-1
     )
 
-    feature_names = pipe.named_steps["pre"].get_feature_names_out()
-
+    # IMPORTANT: permutation importance returns one score per ORIGINAL input column
     importance_df = pd.DataFrame({
-        "feature": feature_names,
+        "feature": X_test.columns,
         "importance": perm.importances_mean
     }).sort_values("importance", ascending=False)
 
@@ -189,7 +185,7 @@ def run_once():
     write_csv_gcs(client, GCS_BUCKET, importance_key, importance_df)
     logging.info(f"Wrote importance: gs://{GCS_BUCKET}/{importance_key}")
 
-    # ---------------- PDP for top 3 features ----------------
+    # ---------------- PDP for top 3 original features ----------------
     top_features = importance_df["feature"].head(3).tolist()
     logging.info(f"Top 3 PDP features: {top_features}")
 
