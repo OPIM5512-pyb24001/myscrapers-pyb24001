@@ -66,16 +66,26 @@ def run_once():
     # ---------------- Feature engineering ----------------
     current_year = pd.Timestamp.now().year
     df["car_age"] = current_year - df["year_num"]
-    df["log_mileage"] = np.log1p(df["mileage_num"])
+
+    # Avoid invalid values in log
+    df["log_mileage"] = np.log1p(df["mileage_num"].clip(lower=0))
+
+    # Add a third safe numeric feature for PDP
+    # Replace 0 age with 1 to avoid division by zero
+    df["miles_per_year"] = df["mileage_num"] / df["car_age"].replace(0, 1)
 
     # ---------------- Filter usable rows ----------------
     df = df[
         df["price_num"].notna() &
         df["year_num"].notna() &
-        df["mileage_num"].notna()
+        df["mileage_num"].notna() &
+        df["car_age"].notna() &
+        df["log_mileage"].notna() &
+        df["miles_per_year"].notna()
     ].copy()
 
     # ---------------- Time split ----------------
+    # Train on past data and predict newest day's listings
     df["scraped_at"] = pd.to_datetime(df["scraped_at"], errors="coerce", utc=True)
     df["date"] = df["scraped_at"].dt.date
 
@@ -100,7 +110,8 @@ def run_once():
         "city",
         "state",
     ]
-    num_cols = ["car_age", "log_mileage"]
+
+    num_cols = ["car_age", "log_mileage", "miles_per_year"]
     features = cat_cols + num_cols
 
     # ---------------- Preprocessing ----------------
@@ -175,7 +186,7 @@ def run_once():
         n_jobs=-1
     )
 
-    # IMPORTANT: permutation importance returns one score per ORIGINAL input column
+    # One importance value per original input feature
     importance_df = pd.DataFrame({
         "feature": X_test.columns,
         "importance": perm.importances_mean
@@ -185,15 +196,15 @@ def run_once():
     write_csv_gcs(client, GCS_BUCKET, importance_key, importance_df)
     logging.info(f"Wrote importance: gs://{GCS_BUCKET}/{importance_key}")
 
-    # ---------------- PDP for top 3 original features ----------------
-    top_features = importance_df["feature"].head(3).tolist()
-    logging.info(f"Top 3 PDP features: {top_features}")
+    # ---------------- PDP for 3 safe numeric features ----------------
+    pdp_features = ["car_age", "log_mileage", "miles_per_year"]
+    logging.info(f"PDP features: {pdp_features}")
 
     fig, ax = plt.subplots(figsize=(12, 8))
     PartialDependenceDisplay.from_estimator(
         pipe,
         X_test,
-        features=top_features,
+        features=pdp_features,
         ax=ax
     )
 
