@@ -41,7 +41,6 @@ def run_once():
 
     df = read_csv_gcs(client, GCS_BUCKET, DATA_KEY)
 
-    # ---- Clean numeric ----
     def clean_num(s):
         return pd.to_numeric(
             s.astype(str).str.replace(r"[^\d.]", "", regex=True),
@@ -52,19 +51,16 @@ def run_once():
     df["year_num"] = clean_num(df["year"])
     df["mileage_num"] = clean_num(df["mileage"])
 
-    # ---- Feature engineering ----
     current_year = pd.Timestamp.now().year
     df["car_age"] = current_year - df["year_num"]
     df["log_mileage"] = np.log1p(df["mileage_num"])
 
-    # ---- Drop bad rows ----
     df = df[
         df["price_num"].notna() &
         df["year_num"].notna() &
         df["mileage_num"].notna()
     ].copy()
 
-    # ---- Time split ----
     df["scraped_at"] = pd.to_datetime(df["scraped_at"], errors="coerce", utc=True)
     df["date"] = df["scraped_at"].dt.date
 
@@ -76,7 +72,6 @@ def run_once():
     logging.info(f"Train rows: {len(train_df)}")
     logging.info(f"Test rows: {len(test_df)}")
 
-    # ---- Features ----
     cat_cols = [
         "make",
         "model",
@@ -91,10 +86,8 @@ def run_once():
     ]
 
     num_cols = ["car_age", "log_mileage"]
-
     features = cat_cols + num_cols
 
-    # ---- Pipeline ----
     preprocessor = ColumnTransformer([
         ("num", SimpleImputer(strategy="median"), num_cols),
         ("cat", Pipeline([
@@ -106,6 +99,8 @@ def run_once():
     model = RandomForestRegressor(
         n_estimators=200,
         max_depth=20,
+        min_samples_split=2,
+        min_samples_leaf=1,
         random_state=42,
         n_jobs=-1
     )
@@ -120,21 +115,18 @@ def run_once():
 
     pipe.fit(X_train, y_train)
 
-    # ---- Predict ----
     X_test = test_df[features]
     preds = pipe.predict(X_test)
 
     test_df["pred_price"] = preds
 
-    # ---- Evaluation ----
     if len(test_df) > 0:
         mae = mean_absolute_error(test_df["price_num"], preds)
         logging.info(f"MAE: {mae}")
 
-    # ---- Output ----
-    now = pd.Timestamp.utcnow()
-    run_id = now.strftime("%Y%m%d%H")
-
+    # --- Output path: UNIQUE TIMESTAMP folder structure ---
+    now_utc = pd.Timestamp.utcnow().tz_convert("UTC")
+    run_id = now_utc.strftime("%Y%m%dT%H%M%SZ")
     output_key = f"{OUTPUT_PREFIX}/{run_id}/preds.csv"
 
     output_df = test_df[[
@@ -153,7 +145,7 @@ def run_once():
 
     logging.info(f"Wrote: gs://{GCS_BUCKET}/{output_key}")
 
-    return {"status": "ok", "rows": len(output_df)}
+    return {"status": "ok", "rows": len(output_df), "output_key": output_key}
 
 
 # ---------------- ENTRYPOINT ----------------
