@@ -26,6 +26,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: dw-dev
 
       - name: Auth (WIF) and Setup gcloud
         uses: google-github-actions/auth@v2
@@ -33,7 +34,8 @@ jobs:
           workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ vars.PROJECT_ID }}
 
@@ -62,7 +64,10 @@ jobs:
 
       - name: Commit and Push New Timestamped File
         if: success()
+        shell: bash
         run: |
+          set -euo pipefail
+
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
@@ -70,8 +75,7 @@ jobs:
           RUN_ID="${{ steps.download_rename.outputs.run_id }}"
 
           git add ${{ env.OUTPUT_DIR }}/$FILENAME
-
           git commit -m "🤖 Data Sync: Add hourly prediction file for run $RUN_ID" || echo "No changes to commit"
 
-          git pull --rebase origin main || true
-          git push
+          git pull --rebase origin dw-dev || true
+          git push origin HEAD:dw-dev
