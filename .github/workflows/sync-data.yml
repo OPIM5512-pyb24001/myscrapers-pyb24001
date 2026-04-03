@@ -28,7 +28,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: dw-dev
 
-      - name: Auth (WIF) and Setup gcloud
+      - name: Auth (WIF)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
@@ -39,8 +39,8 @@ jobs:
         with:
           project_id: ${{ vars.PROJECT_ID }}
 
-      - name: Find Latest Run ID, Download, and Rename File
-        id: download_rename
+      - name: Find Latest Run ID
+        id: latest_run
         shell: bash
         run: |
           set -euo pipefail
@@ -48,21 +48,35 @@ jobs:
           LATEST_RUN_DIR=$(gsutil ls -d gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/*/ | tail -1)
           LATEST_RUN_ID=$(echo "$LATEST_RUN_DIR" | sed -E "s|gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/||; s|/||")
 
-          LOCAL_FILENAME="$LATEST_RUN_ID-preds.csv"
-          GCS_SOURCE_FILE="${{ env.GCS_PREDS_PREFIX }}/$LATEST_RUN_ID/preds.csv"
-          LOCAL_TARGET_FILE="${{ env.OUTPUT_DIR }}/$LOCAL_FILENAME"
-
           echo "run_id=$LATEST_RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "filename=$LOCAL_FILENAME" >> "$GITHUB_OUTPUT"
-
           echo "Detected latest run ID: $LATEST_RUN_ID"
 
-          mkdir -p ${{ env.OUTPUT_DIR }}
-          gsutil cp gs://${BUCKET_NAME}/${GCS_SOURCE_FILE} ${LOCAL_TARGET_FILE}
+      - name: Download latest artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
 
-          echo "Successfully copied: gs://${BUCKET_NAME}/${GCS_SOURCE_FILE} to ${LOCAL_TARGET_FILE}"
+          RUN_ID="${{ steps.latest_run.outputs.run_id }}"
+          mkdir -p "${{ env.OUTPUT_DIR }}"
 
-      - name: Commit and Push New Timestamped File
+          # Download predictions
+          gsutil cp \
+            gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/${RUN_ID}/preds.csv \
+            ${OUTPUT_DIR}/${RUN_ID}-preds.csv
+
+          # Download importance
+          gsutil cp \
+            gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/${RUN_ID}/importance.csv \
+            ${OUTPUT_DIR}/${RUN_ID}-importance.csv
+
+          # Download PDP image
+          gsutil cp \
+            gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/${RUN_ID}/pdp.png \
+            ${OUTPUT_DIR}/${RUN_ID}-pdp.png
+
+          echo "Downloaded all artifacts for run ${RUN_ID}"
+
+      - name: Commit and Push New Files
         if: success()
         shell: bash
         run: |
@@ -71,11 +85,13 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-          FILENAME="${{ steps.download_rename.outputs.filename }}"
-          RUN_ID="${{ steps.download_rename.outputs.run_id }}"
+          RUN_ID="${{ steps.latest_run.outputs.run_id }}"
 
-          git add ${{ env.OUTPUT_DIR }}/$FILENAME
-          git commit -m "🤖 Data Sync: Add hourly prediction file for run $RUN_ID" || echo "No changes to commit"
+          git add ${OUTPUT_DIR}/${RUN_ID}-preds.csv
+          git add ${OUTPUT_DIR}/${RUN_ID}-importance.csv
+          git add ${OUTPUT_DIR}/${RUN_ID}-pdp.png
+
+          git commit -m "🤖 Data Sync: Add hourly artifacts for run ${RUN_ID}" || echo "No changes to commit"
 
           git pull --rebase origin dw-dev || true
           git push origin HEAD:dw-dev
